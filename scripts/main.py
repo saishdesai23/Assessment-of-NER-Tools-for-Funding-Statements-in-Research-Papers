@@ -9,8 +9,7 @@ from bs4 import BeautifulSoup as bs
 def extract_tags(xml_papers) -> list:
     result = []
     art_title, pmc_id, doi, acklge = "", "", "", ""
-    fn_count = 0
-    count = 0
+    ack_count = 0
     for paper in xml_papers:
         art_title = paper.find_all('article-title')[0].text
         # print(art_title)
@@ -31,13 +30,23 @@ def extract_tags(xml_papers) -> list:
                 # print(doi)
             else:
                 doi = 'na'
+
+        print(pmc_id)
         # Funding Information from acknowledgement <ack> tag
-        acklge_ = paper.find("ack")  # attrs
-        if acklge_ is None:
+        ack_tag = paper.find_all("ack")  # attrs
+        print(ack_tag)
+        if len(ack_tag) == 0:
             acklge = 'NA'
         else:
-            acklge = acklge_.find_all("p").text
-
+            ack_count += 1
+            for tag in ack_tag:
+                print(tag)
+                if tag.find_next().name == 'p':
+                    acklge = tag.find_next("p").text
+                    break
+                else:
+                    acklge = 'NA'
+        print(acklge)
         # Funding Information from <title> tag
         title = paper.find_all("title")
         for t in title:
@@ -47,16 +56,14 @@ def extract_tags(xml_papers) -> list:
             else:
                 funding = 'NA'
 
-        # section = paper.find_all("sec")
-        # for sec in section:
-        #     print(sec)
-        #     if sec.title.text == "Funding":
-        #         funding = sec.find("p").text
-        #         print(funding)
-        #         break
-        #     else:
-        #         funding = "NA"
-                # print(funding)
+        # Acknowledgement Information from <title> tag
+        title = paper.find_all("title")
+        for t in title:
+            if t.text.lower() == 'acknowledgments':
+                acknowledgement = t.find_next("p").text
+                break
+            else:
+                acknowledgement = 'NA'
 
         # Funding Information from the footnotes section
         fn = paper.find("fn-group")  # attrs
@@ -68,43 +75,46 @@ def extract_tags(xml_papers) -> list:
                 fn_statement = "NA"
             else:
                 fn_statement = temp.text
-        # acklge = acklge_.text
-        # print(len(acklge_))
-        # if len(acklge_) == 0:
-        #     acklge = "na"
-        # else:
-        #     acklge = acklge_[0].p.text
-        # #     # print(acklge_[0].p.text,'\n')
-        result.append([art_title, pmc_id, doi, acklge, funding, fn_statement])
-    print(count)
-    return result
 
-def save_file(out_filename: str, input_item: list) -> csv:
+        result.append([art_title, pmc_id, doi, acklge, acknowledgement, funding, fn_statement])
+    print(result)
+    funding_dataframe = pd.DataFrame(result)
+    funding_dataframe.columns = ['Article_Title', 'PMC_ID', 'DOI', 'ACK', 'ACKNOWLEDGEMENT', 'FUNDING', 'FOOTNOTES']
+    funding_dataframe = funding_dataframe.set_index(['Article_Title'])
+
+    print(ack_count)
+    print(funding_dataframe)
+    return funding_dataframe
+def save_file(out_filename: str, dataframe) -> csv:
     """
-    It write list output as 'csv' file in the current directory
+    It writes list output as 'csv' file in the current directory
 
     :out_filename:   the name that will be give of the output file
     :input_item:   processed data in list.
     """
-    with open(out_filename, "w") as s:
-        w = csv.writer(s)
-        for row in input_item:
-            w.writerow(row)
+    dataframe.to_csv(out_filename)
 
 if __name__ == '__main__':
-    xml_path = "../data/xml/pmc_result_20210101_20210105.xml"
-    input_file = open(xml_path, 'r')
-    contents = input_file.read()
-    # embedding the XML with beautiful soup module
+    xml_path = "../data/xml"
+    xml_files = os.listdir(xml_path)
+    xml_files = [ele for ele in xml_files if ele.split("_")[0] == "pmc"]
 
-    soup = bs(contents, 'xml')
+    for ele in xml_files:
+        print(os.path.join(xml_path, ele))
+        print(ele.split("_")[-1])
+        input_file = open(os.path.join(xml_path, ele), 'r')
+        contents = input_file.read()
 
-    # extracts of the article units
-    xml_papers = soup.find_all("article")
-    annotated_data = extract_tags(xml_papers)
+        # embedding the XML with beautiful soup module
 
-    # name the processed output file
-    out_filename = "../data/ack_data.csv"
+        soup = bs(contents, 'xml')
 
-    # save the processed file into csv
-    save_file(out_filename, annotated_data)
+        # extracts of the article units
+        xml_papers = soup.find_all("article")
+        annotated_dataframe = extract_tags(xml_papers)
+
+        # name the processed output file
+        out_filename = "../data/ack_data" + ele.split("_")[-1] + ".csv"
+
+        # save the processed file into csv
+        save_file(out_filename, annotated_dataframe)
