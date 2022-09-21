@@ -10,5 +10,5 @@ output - ack_data.csv
 
 Steps
 1. Add the xml file to the xml folder (data/xml/xml_file)
-1. Enter the <xml_file_path> in the **xml_path** var in main.py file and run the code
+1. Add all the xml files in the folder "../data/xml"
 2. Open the "ack_data.csv" from the data folder (data/ack_data.csv)
